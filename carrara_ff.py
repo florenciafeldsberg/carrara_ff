@@ -2,10 +2,11 @@
 GHPython component
 Inputs:
     layer_name : str          -> nombre de la layer a procesar
-    angles     : list[float]  -> ángulos de corte en grados (ej: [0, 45, 90, 180])
 Outputs:
     geo_out    : list[Brep]   -> piezas finales, cada una movida a su propio 0,0,0
     names_out  : list[str]    -> obj_name de cada pieza, en el mismo orden
+
+El ángulo de corte es fijo: gajos de ANGLE_STEP_DEG grados cada uno.
 """
 
 import Rhino
@@ -14,6 +15,12 @@ import scriptcontext as sc
 import math
 
 TOL = sc.doc.ModelAbsoluteTolerance
+ANGLE_STEP_DEG = 30
+
+
+def build_angle_list(step_deg):
+    n = int(round(360.0 / step_deg))
+    return [i * step_deg for i in range(n)]
 
 def get_geometry_by_layer(layer_name):
     prev_doc = sc.doc
@@ -23,6 +30,11 @@ def get_geometry_by_layer(layer_name):
         layer_index = doc.Layers.FindByFullPath(layer_name, True)
         print("layer_name recibido: {!r}".format(layer_name))
         print("layer_index encontrado: {}".format(layer_index))
+        print("TOTAL objetos en el documento de Rhino: {}".format(doc.Objects.Count))
+        layer_paths_presentes = set()
+        for obj in doc.Objects:
+            layer_paths_presentes.add(doc.Layers[obj.Attributes.LayerIndex].FullPath)
+        print("Layers que SI tienen objetos: {}".format(sorted(layer_paths_presentes)))
         if layer_index < 0:
             print("No se encontro la layer, devolviendo lista vacia")
             return []
@@ -112,7 +124,8 @@ def recenter_each(pieces):
 
 
 print("=== inicio run ===")
-print("angles input: {}".format(angles))
+angles_deg = build_angle_list(ANGLE_STEP_DEG)
+print("angles_deg (hardcoded, paso {}): {}".format(ANGLE_STEP_DEG, angles_deg))
 
 raw_breps = get_geometry_by_layer(layer_name)
 print("raw_breps: {}".format(len(raw_breps)))
@@ -121,7 +134,7 @@ if raw_breps:
     bbox = union_bbox(raw_breps)
     print("bbox union min: {}, max: {}".format(bbox.Min, bbox.Max))
     aligned_breps = move_to_origin(raw_breps, bbox.Min)
-    pieces = slice_by_angles(aligned_breps, angles)
+    pieces = slice_by_angles(aligned_breps, angles_deg)
     names_out = name_pieces(pieces, layer_name)
     geo_out = recenter_each(pieces)
     print("geo_out final: {}, names_out final: {}".format(len(geo_out), len(names_out)))
