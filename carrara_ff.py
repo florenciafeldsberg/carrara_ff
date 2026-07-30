@@ -5,6 +5,7 @@ Inputs:
 Outputs:
     geo_out    : list[Brep]   -> piezas finales, cada una movida a su propio 0,0,0
     names_out  : list[str]    -> obj_name de cada pieza, en el mismo orden
+    bbox_out   : list[Box]    -> bounding box de cada pieza final, mismo orden que geo_out
 
 El ángulo de corte es fijo: gajos de ANGLE_STEP_DEG grados cada uno.
 """
@@ -71,7 +72,7 @@ def move_to_origin(breps, corner_pt):
 
 
 def make_cutting_planes(angles_deg, origin=rg.Point3d.Origin, axis=rg.Vector3d.ZAxis):
-    base_plane = rg.Plane(origin, rg.Vector3d.XAxis, rg.Vector3d.YAxis)
+    base_plane = rg.Plane(origin, rg.Vector3d.XAxis, rg.Vector3d.ZAxis)
     planes = []
     for a in angles_deg:
         pl = rg.Plane(base_plane)
@@ -123,9 +124,11 @@ def recenter_each(pieces):
     return recentered
 
 
+def piece_bboxes(pieces):
+    return [rg.Box(p.GetBoundingBox(True)) for p in pieces]
+
+
 print("=== inicio run ===")
-angles_deg = build_angle_list(ANGLE_STEP_DEG)
-print("angles_deg (hardcoded, paso {}): {}".format(ANGLE_STEP_DEG, angles_deg))
 
 raw_breps = get_geometry_by_layer(layer_name)
 print("raw_breps: {}".format(len(raw_breps)))
@@ -134,12 +137,16 @@ if raw_breps:
     bbox = union_bbox(raw_breps)
     print("bbox union min: {}, max: {}".format(bbox.Min, bbox.Max))
     aligned_breps = move_to_origin(raw_breps, bbox.Min)
+    angles_deg = build_angle_list(ANGLE_STEP_DEG)
+    print("angles_deg (hardcoded, paso {}): {}".format(ANGLE_STEP_DEG, angles_deg))
     pieces = slice_by_angles(aligned_breps, angles_deg)
     names_out = name_pieces(pieces, layer_name)
     geo_out = recenter_each(pieces)
-    print("geo_out final: {}, names_out final: {}".format(len(geo_out), len(names_out)))
+    bbox_out = piece_bboxes(geo_out)
+    print("geo_out final: {}, names_out final: {}, bbox_out final: {}".format(len(geo_out), len(names_out), len(bbox_out)))
 else:
     print("raw_breps vacio -> geo_out y names_out van a quedar vacios")
     geo_out = []
     names_out = []
+    bbox_out = []
 print("=== fin run ===")
